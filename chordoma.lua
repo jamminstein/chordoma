@@ -289,7 +289,8 @@ end
 
 local function draw_tempo_page()
   screen.level(12); screen.font_size(10); screen.move(64,18); screen.text_center("TEMPO")
-  screen.font_size(24); screen.level(15); screen.move(64,44); screen.text_center(bpm)
+  -- fix: tostring() required — screen.text_center does not coerce numbers
+  screen.font_size(24); screen.level(15); screen.move(64,44); screen.text_center(tostring(bpm))
   screen.font_size(9); screen.level(8); screen.move(64,56)
   screen.text_center("ARP: "..arp_rate_names[arp_rate_idx])
 end
@@ -317,7 +318,8 @@ function init()
   params:add{type="number",id="arp_rate",name="ARP RATE",min=1,max=#arp_rates,default=3,
     action=function(v) arp_rate_idx=v; restart_active_arps(); screen_dirty=true end}
   params:add{type="number",id="theme",name="THEME",min=1,max=#THEMES,default=1,
-    action=function(v) current_theme=v; screen_dirty=true end}
+    -- fix: regenerate grid when theme changes via params menu
+    action=function(v) current_theme=v; generate_grid(); grid_dirty=true; screen_dirty=true end}
   clock.run(function()
     while true do
       clock.sleep(1/30)
