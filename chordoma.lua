@@ -2,13 +2,13 @@
 -- a jazz/funk/electronic chord grid for norns + monome grid
 -- 
 -- GRID LAYOUT:
---   cols 1–15 : chord pads (8 rows × 15 cols = 120 chords)
---   col  16   : arpeggiator toggles (row 1–8)
+--   cols 1-15 : chord pads (8 rows x 15 cols = 120 chords)
+--   col  16   : arpeggiator toggles (row 1-8)
 --
 -- NORNS SCREEN:
---   page 1 (E1) : play  — shows chord name, root, arp status
---   page 2       : tempo — BPM + arp rate
---   page 3       : theme — vibe/scale preset selector
+--   page 1 (E1) : play  -- shows chord name, root, arp status
+--   page 2       : tempo -- BPM + arp rate
+--   page 3       : theme -- vibe/scale preset selector
 --
 -- ENCODERS (global):
 --   E1 : page select
@@ -29,7 +29,7 @@ local UI = require "ui"
 --------------------------------------------------------------------------------
 local GRID_W  = 16
 local GRID_H  = 8
-local PAD_COLS = 15   -- cols 1–15 are chord pads
+local PAD_COLS = 15   -- cols 1-15 are chord pads
 local ARP_COL  = 16   -- col 16 is arp toggles
 
 --------------------------------------------------------------------------------
@@ -39,7 +39,7 @@ local THEMES = {
   {
     name  = "Jazz Nights",
     roots = {0,2,4,5,7,9,11},           -- C major scale roots
-    center_progression = {               -- left→right center row (row 4)
+    center_progression = {               -- left->right center row (row 4)
       -- {root_offset, chord_type}
       {0,"maj7"},{5,"maj7"},{9,"min7"},{2,"dom7"},
       {7,"min7"},{0,"dom7b9"},{5,"maj9"},{9,"min9"},
@@ -396,7 +396,7 @@ local function draw_play_page()
   -- bpm
   screen.level(5)
   screen.move(64, 62)
-  screen.text_center("BPM " .. bpm .. "  •  ARP " .. arp_rate_names[arp_rate_idx])
+  screen.text_center("BPM " .. bpm .. "  ARP " .. arp_rate_names[arp_rate_idx])
 end
 
 local function draw_tempo_page()
@@ -407,7 +407,7 @@ local function draw_tempo_page()
   screen.font_size(24)
   screen.level(15)
   screen.move(64, 44)
-  screen.text_center(bpm)
+  screen.text_center(tostring(bpm))  -- fix: tostring() required, screen.text_center does not coerce numbers
   screen.font_size(9)
   screen.level(8)
   screen.move(64, 56)
@@ -428,7 +428,7 @@ local function draw_theme_page()
     if i == current_theme then
       screen.level(15)
       screen.move(8, 26 + (i-1)*8)
-      screen.text("▶ " .. th.name)
+      screen.text("> " .. th.name)
     else
       screen.level(5)
       screen.move(12, 26 + (i-1)*8)
@@ -466,7 +466,8 @@ function init()
   params:add{type="number", id="arp_rate", name="ARP RATE", min=1, max=#arp_rates, default=3,
     action=function(v) arp_rate_idx = v; restart_active_arps(); screen_dirty = true end}
   params:add{type="number", id="theme", name="THEME", min=1, max=#THEMES, default=1,
-    action=function(v) current_theme = v; screen_dirty = true end}
+    -- fix: must call generate_grid() so the chord grid actually updates when theme changes
+    action=function(v) current_theme=v; generate_grid(); grid_dirty=true; screen_dirty=true end}
 
   -- screen redraw clock
   clock.run(function()
