@@ -155,12 +155,20 @@ local held = {}
 -- active notes being played (for note-off)
 local active_voices = {}  -- list of {notes[], clock_id}
 
+-- NEW: voicing mode, chord velocity, sustain mode, tied arp
+local voicing_mode = "close"     -- "close", "open", "drop2", "drop3", "shell"
+local chord_velocity = 90         -- MIDI velocity (20-127)
+local sustain_mode = false        -- if true, hold prev chord notes until new chord
+local tied_arp = false            -- if true, arp continues across chord boundaries
+
 local current_page = 1  -- 1=play, 2=tempo, 3=theme
 local last_chord_name = ""
 local last_chord_root = ""
 
 -- arp state
 local arp_clocks = {}     -- arp_clocks[row] = clock id
+local sustain_notes = {}  -- sustain_notes[row] = {notes being sustained}
+local arp_indices = {}    -- arp_indices[row] = current index in arp pattern (for tied_arp)
 
 --------------------------------------------------------------------------------
 -- MIDI
@@ -188,13 +196,49 @@ local function root_name(semitone)
   return names[(semitone % 12) + 1]
 end
 
-local function build_chord(root_midi, type_key)
+local function apply_voicing(notes, voicing)
+  -- Apply voicing variations to rearrange chord notes
+  if not voicing or voicing == "close" then
+    return notes  -- default close voicing
+  end
+
+  local result = {}
+  for i, n in ipairs(notes) do table.insert(result, n) end
+
+  if voicing == "open" then
+    -- Open voicing: spread notes wider across octaves
+    if #result >= 3 then
+      result[2] = result[2] + 12  -- second note up an octave
+    end
+  elseif voicing == "drop2" then
+    -- Drop-2: move second-from-top note down an octave
+    if #result >= 2 then
+      result[#result - 1] = result[#result - 1] - 12
+    end
+  elseif voicing == "drop3" then
+    -- Drop-3: move third-from-top note down an octave
+    if #result >= 3 then
+      result[#result - 2] = result[#result - 2] - 12
+    end
+  elseif voicing == "shell" then
+    -- Shell voicing: keep only root, 3rd, 7th (if they exist)
+    local shell = {}
+    if #result >= 1 then table.insert(shell, result[1]) end        -- root
+    if #result >= 3 then table.insert(shell, result[3]) end        -- 3rd
+    if #result >= 4 then table.insert(shell, result[4]) end        -- 7th
+    result = shell
+  end
+
+  return result
+end
+
+local function build_chord(root_midi, type_key, voicing_type)
   local intervals = CHORD_TYPES[type_key] or {0,4,7}
   local notes = {}
   for _, iv in ipairs(intervals) do
     table.insert(notes, root_midi + iv)
   end
-  return notes
+  return apply_voicing(notes, voicing_type or voicing_mode)
 end
 
 local function tier_for_row(row)
@@ -289,15 +333,23 @@ end
 local function start_arp(row, chord)
   stop_arp(row)
   local notes = chord.notes
-  local i = 1
+
+  -- For tied_arp, continue from last index; otherwise start from 1
+  if not arp_indices[row] then arp_indices[row] = 1 end
+  if not tied_arp then arp_indices[row] = 1 end
+
   arp_clocks[row] = clock.run(function()
     while true do
-      note_on(notes[i], 90)
+      local note_idx = arp_indices[row]
+      local note = notes[note_idx]
+      local vel = chord_velocity + math.random(-8, 8)
+      vel = util.clamp(vel, 0, 127)
+      note_on(note, vel)
       local rate = arp_rates[arp_rate_idx] * (60 / bpm)
       clock.sleep(rate * 0.8)
-      note_off(notes[i])
+      note_off(note)
       clock.sleep(rate * 0.2)
-      i = (i % #notes) + 1
+      arp_indices[row] = (note_idx % #notes) + 1
     end
   end)
 end
@@ -326,7 +378,24 @@ local function play_chord(row, col)
   last_chord_root = root_name(chord.root - 48)
   screen_dirty = true
 
-  for _, n in ipairs(chord.notes) do note_on(n, 100) end
+  -- If sustain_mode is on, release previous chord notes first
+  if sustain_mode and sustain_notes[row] then
+    for _, n in ipairs(sustain_notes[row]) do note_off(n) end
+    sustain_notes[row] = nil
+  end
+
+  -- Play chord with velocity variation
+  for _, n in ipairs(chord.notes) do
+    local vel = chord_velocity + math.random(-8, 8)
+    vel = util.clamp(vel, 0, 127)
+    note_on(n, vel)
+  end
+
+  -- Store notes for sustain mode
+  if sustain_mode then
+    sustain_notes[row] = {}
+    for _, n in ipairs(chord.notes) do table.insert(sustain_notes[row], n) end
+  end
 
   if arp_on[row] then
     start_arp(row, chord)
@@ -336,7 +405,12 @@ end
 local function release_chord(row, col)
   local chord = chord_grid[row][col]
   if not chord then return end
-  for _, n in ipairs(chord.notes) do note_off(n) end
+
+  -- If sustain_mode is off, release chord notes immediately
+  if not sustain_mode then
+    for _, n in ipairs(chord.notes) do note_off(n) end
+  end
+
   if arp_on[row] then stop_arp(row) end
   screen_dirty = true
 end
@@ -469,6 +543,32 @@ function init()
     -- fix: must call generate_grid() so the chord grid actually updates when theme changes
     action=function(v) current_theme=v; generate_grid(); grid_dirty=true; screen_dirty=true end}
 
+  -- NEW: Voicing, Velocity, Sustain, Tied Arp
+  params:add_separator("VOICING & DYNAMICS")
+  params:add_option("voicing", "Chord Voicing", {"close", "open", "drop2", "drop3", "shell"}, 1)
+  params:set_action("voicing", function(v)
+    voicing_mode = {"close", "open", "drop2", "drop3", "shell"}[v]
+    generate_grid()
+    grid_dirty = true
+    screen_dirty = true
+  end)
+
+  params:add{type="number", id="chord_velocity", name="Chord Velocity", min=20, max=127, default=90,
+    action=function(v) chord_velocity = v; screen_dirty = true end}
+
+  params:add_option("sustain_mode", "Sustain Mode", {"off", "on"}, 1)
+  params:set_action("sustain_mode", function(v)
+    sustain_mode = (v == 2)
+    screen_dirty = true
+  end)
+
+  params:add_option("tied_arp", "Tied Arp", {"off", "on"}, 1)
+  params:set_action("tied_arp", function(v)
+    tied_arp = (v == 2)
+    restart_active_arps()
+    screen_dirty = true
+  end)
+
   -- screen redraw clock
   clock.run(function()
     while true do
@@ -531,6 +631,7 @@ function key(n, z)
     for row = 1, GRID_H do
       held[row] = {}
       stop_arp(row)
+      sustain_notes[row] = nil
     end
     last_chord_name = ""
     grid_dirty = true
@@ -538,6 +639,10 @@ function key(n, z)
 
   elseif n == 3 and z == 1 then
     all_notes_off()
+    for row = 1, GRID_H do
+      sustain_notes[row] = nil
+      arp_indices[row] = 1
+    end
     generate_grid()
     for row = 1, GRID_H do held[row] = {} end
     last_chord_name = "Grid Regenerated"
@@ -548,5 +653,8 @@ end
 
 function cleanup()
   all_notes_off()
-  for row = 1, GRID_H do stop_arp(row) end
+  for row = 1, GRID_H do
+    stop_arp(row)
+    sustain_notes[row] = nil
+  end
 end
