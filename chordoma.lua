@@ -223,7 +223,7 @@ local function apply_preset(name)
   
   for key, val in pairs(preset) do
     if key ~= "description" then
-      params:set(key, val)
+      pcall(params.set, params, key, val)
     end
   end
 end
@@ -525,9 +525,7 @@ function redraw()
   -- Tempo
   screen.level(8)
   screen.move(100, 20)
-  screen.text_align_right()
   screen.text(params:get("tempo") .. " BPM")
-  screen.text_align_left()
   
   screen.update()
 end
