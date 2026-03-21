@@ -161,15 +161,15 @@ local CHORD_TYPES = {
 }
 
 local ARP_DIVISIONS = {
-  ["1/4"] = 0.25,
-  ["1/8"] = 0.125,
-  ["1/8T"] = 0.0833,
-  ["1/16"] = 0.0625,
-  ["1/16T"] = 0.0417,
-  ["1/32"] = 0.03125,
+  [\"1/4\"] = 0.25,
+  [\"1/8\"] = 0.125,
+  [\"1/8T\"] = 0.0833,
+  [\"1/16\"] = 0.0625,
+  [\"1/16T\"] = 0.0417,
+  [\"1/32\"] = 0.03125,
 }
 
-local ARP_DIVISION_NAMES = {"1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32"}
+local ARP_DIVISION_NAMES = {\"1/4\", \"1/8\", \"1/8T\", \"1/16\", \"1/16T\", \"1/32\"}
 
 -- ============================================================================
 -- STATE
@@ -278,7 +278,7 @@ local function release_chord(notes)
 end
 
 local function all_notes_off()
-  engine.noteOffAll()
+  engine.noteKillAll()
   
   if midi_out and params:get("midi_enabled") == 2 then
     for ch = 1, 16 do
