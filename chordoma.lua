@@ -486,56 +486,81 @@ function redraw()
   screen.clear()
   screen.aa(1)
 
-  -- Header
-  screen.level(15)
-  screen.font_face(7)
-  screen.font_size(8)
-  screen.move(2, 10)
-  screen.text("CHORDOMA")
-
-  -- Preset name
-  screen.level(8)
-  screen.font_size(7)
-  screen.move(2, 20)
-  screen.text("Preset: " .. PRESET_NAMES[state.preset_idx])
-
-  -- Root note + chord type
-  screen.move(2, 30)
   local root_names = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"}
   local root_name = root_names[(state.root_note % 12) + 1]
   local octave_num = math.floor(state.root_note / 12) - 1
-  screen.text(root_name .. octave_num .. " " .. CHORD_TYPES[state.chord_type_idx]:upper())
+  local chord_type = CHORD_TYPES[state.chord_type_idx]
 
-  -- Arp status
-  screen.move(2, 40)
-  if params:get("arp_mode") > 1 then
-    local arp_modes = {"OFF", "UP", "DOWN", "UP-DN", "RNDM"}
-    local arp_mode_name = arp_modes[params:get("arp_mode")]
+  -- ── Large chord name, centered top area ──
+  screen.level(15)
+  screen.font_face(7)
+  screen.font_size(16)
+  screen.move(64, 18)
+  screen.text_center(root_name .. octave_num .. " " .. chord_type)
+
+  -- ── Preset name, right-aligned subtle ──
+  screen.level(4)
+  screen.font_face(1)
+  screen.font_size(8)
+  screen.move(126, 28)
+  screen.text_right(PRESET_NAMES[state.preset_idx])
+
+  -- ── Grid activity: 8 rows x 15 cols miniature ──
+  -- Shows which chord pads are held as a dot matrix
+  local grid_x = 2
+  local grid_y = 32
+  local dot_w = 7
+  local dot_h = 3
+  for row = 1, 8 do
+    for col = 1, 15 do
+      local sx = grid_x + (col - 1) * dot_w
+      local sy = grid_y + (row - 1) * dot_h
+      if state.held_chords[row][col] then
+        -- Active chord: bright filled rect
+        local lv = state.arp_active[row] and 15 or 12
+        screen.level(lv)
+        screen.rect(sx, sy, dot_w - 1, dot_h - 1)
+        screen.fill()
+      else
+        -- Inactive: dim dot
+        screen.level(1)
+        screen.pixel(sx + 2, sy + 1)
+        screen.fill()
+      end
+    end
+    -- Arp indicator per row (right edge)
+    if state.arp_active[row] then
+      screen.level(12)
+      screen.rect(grid_x + 15 * dot_w + 1, grid_y + (row - 1) * dot_h, 2, dot_h - 1)
+      screen.fill()
+    end
+  end
+
+  -- ── Arp status bar (bottom left) ──
+  screen.font_face(1)
+  screen.font_size(8)
+  local arp_mode = params:get("arp_mode")
+  if arp_mode > 1 then
+    local arp_modes = {"OFF", "UP", "DN", "U/D", "RND"}
+    local arp_mode_name = arp_modes[arp_mode]
     local div_name = ARP_DIVISION_NAMES[params:get("arp_division")]
-    screen.text("Arp: " .. arp_mode_name .. " " .. div_name)
+    screen.level(10)
+    screen.move(2, 62)
+    screen.text("ARP " .. arp_mode_name .. " " .. div_name)
   else
-    screen.text("Arp: OFF")
+    screen.level(3)
+    screen.move(2, 62)
+    screen.text("ARP off")
   end
 
-  -- MIDI/OP-XY status
-  screen.level(5)
-  screen.move(2, 50)
-  local status = ""
-  if params:get("midi_enabled") == 2 then
-    status = status .. "MIDI "
-  end
-  if params:get("opxy_enabled") == 2 then
-    status = status .. "OP-XY"
-  end
-  if status == "" then
-    status = "(Local only)"
-  end
-  screen.text(status)
-
-  -- Tempo
-  screen.level(8)
-  screen.move(100, 20)
-  screen.text(params:get("clock_tempo") .. " BPM")
+  -- ── BPM + output status (bottom right) ──
+  screen.level(4)
+  screen.move(126, 62)
+  local bpm = math.floor(params:get("clock_tempo"))
+  local out_str = bpm .. "bpm"
+  if params:get("midi_enabled") == 2 then out_str = "M " .. out_str end
+  if params:get("opxy_enabled") == 2 then out_str = "XY " .. out_str end
+  screen.text_right(out_str)
 
   screen.update()
 end
