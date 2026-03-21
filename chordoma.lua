@@ -645,6 +645,8 @@ end
 -- ============================================================================
 
 function cleanup()
+  clock.cancel_all()
+
   -- Stop all arps
   for row = 1, 8 do
     stop_arp(row)
