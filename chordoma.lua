@@ -161,15 +161,15 @@ local CHORD_TYPES = {
 }
 
 local ARP_DIVISIONS = {
-  [\"1/4\"] = 0.25,
-  [\"1/8\"] = 0.125,
-  [\"1/8T\"] = 0.0833,
-  [\"1/16\"] = 0.0625,
-  [\"1/16T\"] = 0.0417,
-  [\"1/32\"] = 0.03125,
+  ["1/4"] = 0.25,
+  ["1/8"] = 0.125,
+  ["1/8T"] = 0.0833,
+  ["1/16"] = 0.0625,
+  ["1/16T"] = 0.0417,
+  ["1/32"] = 0.03125,
 }
 
-local ARP_DIVISION_NAMES = {\"1/4\", \"1/8\", \"1/8T\", \"1/16\", \"1/16T\", \"1/32\"}
+local ARP_DIVISION_NAMES = {"1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32"}
 
 -- ============================================================================
 -- STATE
@@ -626,6 +626,9 @@ function init()
   -- Tempo
   params:add_separator("TIMING")
   params:add_number("tempo", "BPM", 40, 240, 120)
+  
+  -- Apply default preset on startup
+  apply_preset(PRESET_NAMES[state.preset_idx])
   
   redraw()
   grid_redraw()
