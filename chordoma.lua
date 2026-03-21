@@ -341,7 +341,8 @@ local function start_arp(row, chord)
   arp_clocks[row] = clock.run(function()
     while true do
       local note_idx = arp_indices[row]
-      local note = notes[note_idx]
+      local v_idx = ((note_idx - 1) % #notes) + 1
+      local note = notes[v_idx]
       local vel = chord_velocity + math.random(-8, 8)
       vel = util.clamp(vel, 0, 127)
       note_on(note, vel)
