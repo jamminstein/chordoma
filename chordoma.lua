@@ -670,13 +670,11 @@ end
 -- ============================================================================
 
 function cleanup()
-  clock.cancel_all()
-
-  -- Stop all arps
+  -- Stop all arps (cancels individual arp clocks)
   for row = 1, 8 do
     stop_arp(row)
   end
 
-  -- All notes off
+  -- All notes off (engine + MIDI + OPXY)
   all_notes_off()
 end
