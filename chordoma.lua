@@ -1,11 +1,30 @@
 -- chordoma.lua
 -- Jazz/funk/electronic chord grid for monome norns + grid (v1)
 -- 120 chord pads with arpeggiator and internal synth
+-- OP-XY MIDI support added
 
 engine.name = "MollyThePoly"
 
 local g = grid.connect()
 local midi_out = midi.connect(1)
+
+-- OP-XY MIDI helpers
+local opxy_out = nil
+local function opxy_note_on(note, vel)
+  if opxy_out and params:get("opxy_enabled") == 2 then
+    opxy_out:note_on(note, vel, params:get("opxy_channel"))
+  end
+end
+local function opxy_note_off(note)
+  if opxy_out and params:get("opxy_enabled") == 2 then
+    opxy_out:note_off(note, 0, params:get("opxy_channel"))
+  end
+end
+local function opxy_cc(cc, val)
+  if opxy_out and params:get("opxy_enabled") == 2 then
+    opxy_out:cc(cc, math.floor(util.clamp(val, 0, 127)), params:get("opxy_channel"))
+  end
+end
 
 -- helpers
 local function clamp(x, lo, hi)
@@ -80,11 +99,13 @@ end
 
 local function note_on(note, vel)
   if midi_out then midi_out:note_on(note, vel, 1) end
+  opxy_note_on(note, vel)
   engine_note_on(note, vel)
 end
 
 local function note_off(note)
   if midi_out then midi_out:note_off(note, 0, 1) end
+  opxy_note_off(note)
   engine_note_off(note)
 end
 
@@ -102,6 +123,9 @@ local function play_chord(root, chord_type, vel)
   for _, note in ipairs(notes) do
     note_on(note, vel)
   end
+  -- Map arp rate to CC 40 (LFO rate)
+  local lfo_rate_cc = math.floor((state.arp_rate / 7) * 127)
+  opxy_cc(40, lfo_rate_cc)
   return notes
 end
 
@@ -133,6 +157,15 @@ function redraw()
     
     screen.move(2, 40)
     screen.text("ARP RATE: " .. state.arp_rate)
+    
+    -- OP-XY status
+    screen.level(5)
+    screen.move(2, 50)
+    if params:get("opxy_enabled") == 2 then
+      screen.text("OP-XY: ON CH" .. params:get("opxy_channel"))
+    else
+      screen.text("OP-XY: OFF")
+    end
     
   elseif state.page == 2 then
     -- Tempo page
@@ -253,6 +286,10 @@ function key(n, z)
         end
       end
     end
+    -- Send all-notes-off to OP-XY
+    if opxy_out and params:get("opxy_enabled") == 2 then
+      opxy_out:all_notes_off(params:get("opxy_channel"))
+    end
   elseif n == 3 and z == 1 then
     -- Randomize layout
     for row = 1, 8 do
@@ -266,6 +303,12 @@ function key(n, z)
 end
 
 function init()
+  params:add_separator("OP-XY")
+  params:add_option("opxy_enabled", "OP-XY output", {"off", "on"}, 1)
+  params:add_number("opxy_device", "OP-XY MIDI device", 1, 4, 1)
+  params:add_number("opxy_channel", "OP-XY channel", 1, 8, 1)
+  params:set_action("opxy_device", function(v) opxy_out = midi.connect(v) end)
+  
   redraw()
   grid_redraw()
 end
@@ -273,4 +316,7 @@ end
 function cleanup()
   engine.noteOffAll()
   if midi_out then midi_out:all_notes_off(1) end
+  if opxy_out and params:get("opxy_enabled") == 2 then
+    opxy_out:all_notes_off(params:get("opxy_channel"))
+  end
 end
