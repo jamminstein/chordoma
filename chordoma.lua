@@ -484,7 +484,7 @@ end
 
 function redraw()
   screen.clear()
-  screen.aa(1)
+  screen.aa(0)
 
   local root_names = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"}
   local root_name = root_names[(state.root_note % 12) + 1]
@@ -493,7 +493,7 @@ function redraw()
 
   -- ── Large chord name, centered top area ──
   screen.level(15)
-  screen.font_face(7)
+  screen.font_face(1)
   screen.font_size(16)
   screen.move(64, 18)
   screen.text_center(root_name .. octave_num .. " " .. chord_type)
